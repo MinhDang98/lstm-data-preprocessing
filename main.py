@@ -7,8 +7,13 @@ def prepare_header(data):
     with open(data, 'w') as wf:
         wf.write('ID,NAME,YEAR,MONTH,LAT,LONG,MAX WIND,MIN PRESSURE,CATEGORY\n')
 
-def data_extraction(data):
-    ORIGINAL_DATA = 'original_hurdat2.txt'
+def data_extraction(data, mode='atlantic'):
+    ORIGINAL_DATA = ''
+    if mode == 'atlantic':
+        ORIGINAL_DATA = 'data/atlantic.txt'
+    elif mode == 'pacific':
+        ORIGINAL_DATA = 'data/pacific.txt'
+
     unnamed_counter = 0
     hurricane_name = ''
     hurricane_id = -1
@@ -33,8 +38,8 @@ def data_extraction(data):
             else:
                 year = line[0][:4].replace(' ', '')
                 month = line[0][4:6].replace(' ', '')
-                lat = line[4].replace(' ', '')
-                long = '-' + line[5].replace(' ', '')
+                lat = line[4].replace(' ', '')[:-1]
+                long = '-' + line[5].replace(' ', '')[:-1]
                 max_wind = int(line[6].replace(' ', ''))
                 if 74 <= max_wind <= 95:
                     cat = 1
@@ -59,15 +64,19 @@ def get_CO2(data):
     df = df.drop('unc', axis=1)
     return df
 
-def graph_hurricane_category():
+def graph_hurricane_category(hurricane_df, mode='atlantic'):
     grouped = hurricane_df.groupby('CATEGORY')['ID'].nunique()
     grouped.plot(kind='bar')
-
     ax = plot.gca()
     plot.xticks(rotation=0)
     plot.ylabel('Counts')
     plot.xlabel('Hurricane Category')
-    plot.title('Distribution of Hurricane Categories in the Atlantic, Northeast and North Central Pacific Oceans')
+    title = ''
+    if mode == 'atlantic':
+        title = 'Distribution of Hurricane Categories in the Atlantic Ocean'
+    elif mode == 'pacific':
+        title = 'Distribution of Hurricane Categories in the Northeast and North Central Pacific Oceans'
+    plot.title(title)
     textstr = '\n'.join(('Category 0: Winds less than 74 mph',
                         'Category 1: Winds 74 to 95 mph',
                         'Category 2: Winds 96 to 110 mph',
@@ -75,75 +84,53 @@ def graph_hurricane_category():
                         'Category 4: Winds 131 to 155 mph',
                         'Category 5: Winds greater than 155 mph'))
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    ax.text(0.7, 0.98, textstr, transform=ax.transAxes, fontsize=14, verticalalignment='top', bbox=props)
+    ax.text(0.65, 0.98, textstr, transform=ax.transAxes, fontsize=14, verticalalignment='top', bbox=props)
     for p in ax.patches:
         ax.annotate(str(p.get_height()), (p.get_x() + 0.25, p.get_height() + 1.25), ha='center')
     plot.show()
 
-def graph_hurricane_month():
+def graph_hurricane_month(hurricane_df, mode='atlantic'):
     grouped = hurricane_df.groupby('MONTH')['ID'].nunique()
     grouped.plot(kind='bar')
-    
+    title = ''
+    if mode == 'atlantic':
+        title = 'Monthly Frequency of Hurricanes in the Atlantic Ocean'
+    elif mode == 'pacific':
+        title = 'Monthly Frequency of Hurricanes in the Northeast and North Central Pacific Oceans'
     plot.xticks(rotation=0)
     plot.ylabel('Counts')
     plot.xlabel('Month')
-    plot.title('Monthly Hurricane Count in the Atlantic and Northeast and North Central Pacific Oceans')
+    plot.title(title)
     plot.show()
 
-def graph_co2_count(hur_df, co2_df):
-    # only graph from 1959
-    hurricane_by_year = hur_df.astype({"YEAR": int})
-    hurricane_by_year = hurricane_by_year.drop_duplicates('NAME')
-    hurricane_by_year = hurricane_by_year[hurricane_by_year['YEAR'] >= 1980]
-    hurricane_by_year = hurricane_by_year.rename(str.lower, axis='columns')
-    hurricane_by_year = hurricane_by_year.groupby('year').size()
-    hurricane_by_year = hurricane_by_year.to_list()
-    co2_df = co2_df[co2_df['year'] > 1980]
-    co2_df = co2_df['mean'].to_list()
-    co2_hurricane_df = pd.DataFrame({'hurricane count': hurricane_by_year,
-                                    'co2 mean': co2_df})
-    co2_hurricane_df['hurricane count'].plot(kind='bar')
-    co2_hurricane_df['co2 mean'].plot(secondary_y=True)
-    plot.title('Correlation of Mean CO2 level and Frequency of Hurricanes')
-    ax = plot.gca()
-    plot.show()
-
-def reformat(data):
-    pd_to_csv = pd.read_csv(data, sep=",")
-    pd_to_csv.rename(columns={'ID': 'Serial_Num', 'MAX WIND': 'wmo_wind',
-                        'MIN PRESSURE': 'wmo_pres', 'CATEGORY': 'Category',
-                        'NAME': 'Name', 'LAT': 'Latitude', 'LONG': 'Longtitude',
-                        'YEAR': 'year', 'MONTH': 'month'}, inplace=True)
-    # pd_to_csv['Category'].replace({'DB': 1, 'LO': 1, 'SD': 2,
-    #                             'EX': 2, 'SS': 3, 'TD': 3,
-    #                             'TS': 4, 'HU': 5}, inplace=True)
-    pd_to_csv['Longtitude'] = pd_to_csv['Longtitude'].str[:-1]
-    pd_to_csv['Latitude'] = pd_to_csv['Latitude'].str[:-1]
-    pd_to_csv['wmo_pres'] = pd_to_csv['wmo_pres'].astype(int)
-    pd_to_csv['wmo_pres'].replace({-999: 0}, inplace=True)
-    print(pd_to_csv.head())
-    pd_to_csv.to_csv('data.csv', index=False)
 
 if __name__ == "__main__":
-    CLEAN_DATA = str('cleanned_hurdat2.txt')
+    ATLANTIC_DATA = 'atlantic_cleanned_hurdat2.txt'
+    PACIFIC_DATA = 'pacific_cleanned_hurdat2.txt'
+
     # getting the data
     get_data = False
     if get_data:
-        prepare_header(CLEAN_DATA)
-        hurricane_data = data_extraction(CLEAN_DATA)
-        # reformat clean data
-        reformat(CLEAN_DATA)
+        prepare_header(ATLANTIC_DATA)
+        hurricane_data = data_extraction(ATLANTIC_DATA)
+
+        prepare_header(PACIFIC_DATA)
+        hurricane_data = data_extraction(PACIFIC_DATA, 'pacific')
 
     # load data
-    hurricane_df = pd.read_csv(CLEAN_DATA, sep=",")
-    # print(hurricane_df.head())
+    atlantic_hurricane_df = pd.read_csv(ATLANTIC_DATA, sep=",")
+    pacific_hurricane_df = pd.read_csv(PACIFIC_DATA, sep=",")
+    # print(atlantic_hurricane_df.head())
+    # print(pacific_hurricane_df.head())
 
     # load co2
-    C02_DATA = 'co2.txt'
+    C02_DATA = 'data/co2.txt'
     co2_df = get_CO2(C02_DATA)
     # print(co2_df.head())
 
     # simple visualizations
-    # graph_hurricane_category()
-    # graph_hurricane_month()
-    graph_co2_count(hurricane_df, co2_df)
+    # graph_hurricane_category(atlantic_hurricane_df)
+    # graph_hurricane_category(pacific_hurricane_df, mode='pacific')
+
+    # graph_hurricane_month(atlantic_hurricane_df)
+    # graph_hurricane_month(pacific_hurricane_df, mode='pacific')

@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plot
-
+import folium
 
 def prepare_header(data):
     with open(data, 'w') as wf:
@@ -10,9 +10,9 @@ def prepare_header(data):
 def data_extraction(data, mode='atlantic'):
     ORIGINAL_DATA = ''
     if mode == 'atlantic':
-        ORIGINAL_DATA = 'data/atlantic.txt'
+        ORIGINAL_DATA = 'data/atlantic.csv'
     elif mode == 'pacific':
-        ORIGINAL_DATA = 'data/pacific.txt'
+        ORIGINAL_DATA = 'data/pacific.csv'
 
     unnamed_counter = 0
     hurricane_name = ''
@@ -27,7 +27,6 @@ def data_extraction(data, mode='atlantic'):
             max_wind = 0
             min_pressure = 0
             cat = 0
-            hurricane_id += 1
             # header line has length = 4
             if len(line) == 4:
                 if line[1].replace(' ', '') == 'UNNAMED':
@@ -35,6 +34,7 @@ def data_extraction(data, mode='atlantic'):
                 else:
                     hurricane_name = line[1].replace(' ', '')
                 unnamed_counter += 1
+                hurricane_id += 1
             else:
                 year = line[0][:4].replace(' ', '')
                 month = line[0][4:6].replace(' ', '')
@@ -53,10 +53,12 @@ def data_extraction(data, mode='atlantic'):
                     cat = 5
                 else:
                     cat = 0
-                min_pressure = line[7].replace(' ', '')
+                min_pressure = int(line[7].replace(' ', ''))
+                if min_pressure == -999:
+                    min_pressure = 0
                 with open(data, 'a') as wf:
                     wf.write(str(hurricane_id) + ',' + hurricane_name + ',' +  year + ',' + month +
-                            ',' + lat + ',' + long + ',' + str(max_wind) + ',' + min_pressure +
+                            ',' + lat + ',' + long + ',' + str(max_wind) + ',' + str(min_pressure) +
                             ',' + str(cat) + '\n')
 
 def get_CO2(data):
@@ -73,9 +75,9 @@ def graph_hurricane_category(hurricane_df, mode='atlantic'):
     plot.xlabel('Hurricane Category')
     title = ''
     if mode == 'atlantic':
-        title = 'Distribution of Hurricane Categories in the Atlantic Ocean'
+        title = 'Frequency of Hurricane Categories in the Atlantic Ocean'
     elif mode == 'pacific':
-        title = 'Distribution of Hurricane Categories in the Northeast and North Central Pacific Oceans'
+        title = 'Frequency of Hurricane Categories in the Northeast and North Central Pacific Oceans'
     plot.title(title)
     textstr = '\n'.join(('Category 0: Winds less than 74 mph',
                         'Category 1: Winds 74 to 95 mph',
@@ -103,10 +105,55 @@ def graph_hurricane_month(hurricane_df, mode='atlantic'):
     plot.title(title)
     plot.show()
 
+def storm_track(hurricane_df, mode='atlantic'):
+    temp_df = hurricane_df[['ID', 'NAME', 'YEAR', 'CATEGORY']]
+    cat_0 = temp_df.loc[hurricane_df['CATEGORY'] == 0].sample(n=3)
+    cat_1 = temp_df.loc[hurricane_df['CATEGORY'] == 1].sample(n=3)
+    cat_2 = temp_df.loc[hurricane_df['CATEGORY'] == 2].sample(n=3)
+    cat_3 = temp_df.loc[hurricane_df['CATEGORY'] == 3].sample(n=3)
+    cat_4 = temp_df.loc[hurricane_df['CATEGORY'] == 4].sample(n=3)
+    cat_5 = temp_df.loc[hurricane_df['CATEGORY'] == 5]
+    hurricane_coor = cat_0.values.tolist()
+    hurricane_coor.extend(cat_1.values.tolist())
+    hurricane_coor.extend(cat_2.values.tolist())
+    hurricane_coor.extend(cat_3.values.tolist())
+    hurricane_coor.extend(cat_4.values.tolist())
+    hurricane_coor.extend(cat_5.values.tolist())
+    hurricane_list = []
+    for i in hurricane_coor:
+        id, name, year, category = i
+        coor = hurricane_df.loc[hurricane_df['ID'] == id][['LAT', 'LONG']].values.tolist()
+        hurricane_list.append((coor, name, year, category))
+
+    map = folium.Map(zoom_start=6)
+    for coord in hurricane_list:
+        coordinate, name, year, category = coord
+        color = ''
+        if category == 0:
+            color = 'gray'
+        elif category == 1:
+            color = 'blue'
+        elif category == 2:
+            color = 'orange'
+        elif category == 3:
+            color = 'lightred'
+        elif category == 4:
+            color = 'red'
+        elif category == 5:
+            color = 'darkred'
+        tooltip = name + ' in ' + str(year) + ' category ' + str(category)
+        my_PolyLine=folium.PolyLine(locations=coordinate, weight=3, color=color, tooltip=tooltip)
+        map.add_child(my_PolyLine)
+        folium.Marker(location=coordinate[0], tooltip=name + ' start', icon=folium.Icon(color=color)).add_to(map)
+        folium.Marker(location=coordinate[-1], tooltip=name + ' end', icon=folium.Icon(color=color)).add_to(map)
+    if mode == 'atlantic':
+        map.save('atlantic-map.html')
+    elif mode == 'pacific':
+        map.save('pacific-map.html')
 
 if __name__ == "__main__":
-    ATLANTIC_DATA = 'atlantic_cleanned_hurdat2.txt'
-    PACIFIC_DATA = 'pacific_cleanned_hurdat2.txt'
+    ATLANTIC_DATA = 'atlantic_cleanned_hurdat2.csv'
+    PACIFIC_DATA = 'pacific_cleanned_hurdat2.csv'
 
     # getting the data
     get_data = False
@@ -120,13 +167,9 @@ if __name__ == "__main__":
     # load data
     atlantic_hurricane_df = pd.read_csv(ATLANTIC_DATA, sep=",")
     pacific_hurricane_df = pd.read_csv(PACIFIC_DATA, sep=",")
+
     # print(atlantic_hurricane_df.head())
     # print(pacific_hurricane_df.head())
-
-    # load co2
-    C02_DATA = 'data/co2.txt'
-    co2_df = get_CO2(C02_DATA)
-    # print(co2_df.head())
 
     # simple visualizations
     # graph_hurricane_category(atlantic_hurricane_df)
@@ -134,3 +177,6 @@ if __name__ == "__main__":
 
     # graph_hurricane_month(atlantic_hurricane_df)
     # graph_hurricane_month(pacific_hurricane_df, mode='pacific')
+
+    storm_track(atlantic_hurricane_df)
+    storm_track(pacific_hurricane_df, 'pacific')

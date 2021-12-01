@@ -160,27 +160,57 @@ def storm_track(hurricane_df, mode='atlantic'):
         map.save('pacific-map.html')
 
 
-def single_step_visualization():
+def single_step_visualization(hurricane_df):
     DATA_FILE = 'data/single.txt'
     id = ''
-    name = ''
-    actual = ''
-    predict = ''
-    results = defaultdict(list)
-    actual_pattern = re.compile('^actual')
-    predict_pattern = re.compile('^predict')
+    name = None
+    actual = []
+    predict = []
+    actual_pattern = re.compile('^   actual')
+    predict_pattern = re.compile('^   predict')
+    lat_long_pattern = re.compile('\(.*?\)')
     name_pattern = re.compile('^Name')
     id_pattern = re.compile('^ID')
-
+    map = folium.Map(zoom_start=6)
+    valid = ['EMA', 'FAUSTO', 'HENRIETTE', 'MARIE', 'WALAKA']
     with open(DATA_FILE, 'r') as f:
+        last_id = None
         for line in f:
             line = line.rstrip()
-                for match in re.finditer(actual_pattern, line):
-                    temp = line.split(' ')
-                    results[name].append(temp[1])
-                for match in re.finditer(predict_pattern, line):
-                    temp = line.split(' ')
-                    results[name].append(temp[1])
+            for match in re.finditer(id_pattern, line):
+                id = line.split(' ')[-1]
+                if last_id != id and name in valid:
+                    actual = hurricane_df.loc[hurricane_df['ID'] == int(last_id)][['LAT', 'LONG']].values.tolist()[0:12]
+                    predict_first_five = hurricane_df.loc[hurricane_df['ID'] == int(last_id)][['LAT', 'LONG']].values.tolist()[0:5]
+                    predict_first_five.extend(predict)
+                    predict_PolyLine = folium.PolyLine(locations=predict_first_five, weight=3, color='red', tooltip='Predicted '+ name)
+                    map.add_child(predict_PolyLine)
+                    actual_PolyLine = folium.PolyLine(locations=actual, weight=3, color='blue', tooltip='Actual '+ name)
+                    map.add_child(actual_PolyLine)
+                    folium.Marker(location=actual[0], tooltip=name + ' start', icon=folium.Icon(color='green')).add_to(map)
+                    folium.Marker(location=predict_first_five[-1], tooltip=name + ' end predicted', icon=folium.Icon(color='red')).add_to(map)
+                    folium.Marker(location=actual[-1], tooltip=name + ' end actual', icon=folium.Icon(color='blue')).add_to(map)
+                actual = []
+                predict = []
+                last_id = id
+            for match in re.finditer(name_pattern, line):
+                name = line.split(' ')[-1]
+            for match in re.finditer(actual_pattern, line):
+                temp = lat_long_pattern.findall(line)[0][1:-1]
+                if temp:
+                    temp = temp.split(', ')
+                    lat = temp[0]
+                    long = temp[1]
+                    actual.append([float(lat), float(long)])
+            for match in re.finditer(predict_pattern, line):
+                temp = lat_long_pattern.findall(line)[0][1:-1]
+                if temp:
+                    temp = temp.split(', ')
+                    lat = temp[0]
+                    long = temp[1]
+                    predict.append([float(lat), float(long)])
+    map.save('prediction.html')
+
 
 def multiple_step_visualization():
     pass
@@ -215,3 +245,4 @@ if __name__ == "__main__":
 
     # storm_track(atlantic_hurricane_df)
     # storm_track(pacific_hurricane_df, 'pacific')
+    single_step_visualization(pacific_hurricane_df)

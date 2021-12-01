@@ -2,10 +2,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plot
 import folium
+import re
+from collections import defaultdict
+
 
 def prepare_header(data):
     with open(data, 'w') as wf:
         wf.write('ID,NAME,YEAR,MONTH,LAT,LONG,MAX WIND,MIN PRESSURE,CATEGORY\n')
+
 
 def data_extraction(data, mode='atlantic'):
     ORIGINAL_DATA = ''
@@ -61,10 +65,12 @@ def data_extraction(data, mode='atlantic'):
                             ',' + lat + ',' + long + ',' + str(max_wind) + ',' + str(min_pressure) +
                             ',' + str(cat) + '\n')
 
+
 def get_CO2(data):
     df = pd.read_csv(data)
     df = df.drop('unc', axis=1)
     return df
+
 
 def graph_hurricane_category(hurricane_df, mode='atlantic'):
     grouped = hurricane_df.groupby('CATEGORY')['ID'].nunique()
@@ -91,6 +97,7 @@ def graph_hurricane_category(hurricane_df, mode='atlantic'):
         ax.annotate(str(p.get_height()), (p.get_x() + 0.25, p.get_height() + 1.25), ha='center')
     plot.show()
 
+
 def graph_hurricane_month(hurricane_df, mode='atlantic'):
     grouped = hurricane_df.groupby('MONTH')['ID'].nunique()
     grouped.plot(kind='bar')
@@ -104,6 +111,7 @@ def graph_hurricane_month(hurricane_df, mode='atlantic'):
     plot.xlabel('Month')
     plot.title(title)
     plot.show()
+
 
 def storm_track(hurricane_df, mode='atlantic'):
     temp_df = hurricane_df[['ID', 'NAME', 'YEAR', 'CATEGORY']]
@@ -151,6 +159,33 @@ def storm_track(hurricane_df, mode='atlantic'):
     elif mode == 'pacific':
         map.save('pacific-map.html')
 
+
+def single_step_visualization():
+    DATA_FILE = 'data/single.txt'
+    id = ''
+    name = ''
+    actual = ''
+    predict = ''
+    results = defaultdict(list)
+    actual_pattern = re.compile('^actual')
+    predict_pattern = re.compile('^predict')
+    name_pattern = re.compile('^Name')
+    id_pattern = re.compile('^ID')
+
+    with open(DATA_FILE, 'r') as f:
+        for line in f:
+            line = line.rstrip()
+                for match in re.finditer(actual_pattern, line):
+                    temp = line.split(' ')
+                    results[name].append(temp[1])
+                for match in re.finditer(predict_pattern, line):
+                    temp = line.split(' ')
+                    results[name].append(temp[1])
+
+def multiple_step_visualization():
+    pass
+
+
 if __name__ == "__main__":
     ATLANTIC_DATA = 'atlantic_cleanned_hurdat2.csv'
     PACIFIC_DATA = 'pacific_cleanned_hurdat2.csv'
@@ -178,5 +213,5 @@ if __name__ == "__main__":
     # graph_hurricane_month(atlantic_hurricane_df)
     # graph_hurricane_month(pacific_hurricane_df, mode='pacific')
 
-    storm_track(atlantic_hurricane_df)
-    storm_track(pacific_hurricane_df, 'pacific')
+    # storm_track(atlantic_hurricane_df)
+    # storm_track(pacific_hurricane_df, 'pacific')

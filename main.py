@@ -162,6 +162,8 @@ def storm_track(hurricane_df, mode='atlantic'):
 
 def single_step_visualization(hurricane_df):
     DATA_FILE = 'data/single.txt'
+    DATA_FILE_2 = 'data/single_2.txt'
+
     id = ''
     name = None
     actual = []
@@ -173,19 +175,26 @@ def single_step_visualization(hurricane_df):
     id_pattern = re.compile('^ID')
     map = folium.Map(zoom_start=6)
     valid = ['EMA', 'FAUSTO', 'HENRIETTE', 'MARIE', 'WALAKA']
-    with open(DATA_FILE, 'r') as f:
+    valid_2 = ['MARIO', 'TWENTYONE', 'HERNAN', 'NATE', 'ALBERTO', 'MICHAEL', 'HUMBERTO', 'CRISTOBAL', 'ISAIAS', 'OMAR',
+                'GAMMA', 'DELTA', 'ZETA']
+
+    with open(DATA_FILE_2, 'r') as f:
         last_id = None
         for line in f:
             line = line.rstrip()
             for match in re.finditer(id_pattern, line):
-                id = line.split(' ')[-1]
-                if last_id != id and name in valid:
-                    actual = hurricane_df.loc[hurricane_df['ID'] == int(last_id)][['LAT', 'LONG']].values.tolist()[0:12]
-                    predict_first_five = hurricane_df.loc[hurricane_df['ID'] == int(last_id)][['LAT', 'LONG']].values.tolist()[0:5]
+                id = int(line.split(' ')[-1])
+                if id <= 48:
+                    id += 1121
+                else:
+                    id += 1799
+                if last_id != id and name in valid_2:
+                    actual = hurricane_df.loc[(hurricane_df['ID'] == int(last_id)) & (hurricane_df['NAME'] == name)][['LAT', 'LONG']].values.tolist()[0:12]
+                    predict_first_five = hurricane_df.loc[(hurricane_df['ID'] == int(last_id)) & (hurricane_df['NAME'] == name)][['LAT', 'LONG']].values.tolist()[0:5]
                     predict_first_five.extend(predict)
-                    predict_PolyLine = folium.PolyLine(locations=predict_first_five, weight=3, color='red', tooltip='Predicted '+ name)
+                    predict_PolyLine = folium.PolyLine(locations=predict_first_five, weight=3, color='red', tooltip='Predicted '+ name, id=name)
                     map.add_child(predict_PolyLine)
-                    actual_PolyLine = folium.PolyLine(locations=actual, weight=3, color='blue', tooltip='Actual '+ name)
+                    actual_PolyLine = folium.PolyLine(locations=actual, weight=3, color='blue', tooltip='Actual '+ name, id=name)
                     map.add_child(actual_PolyLine)
                     folium.Marker(location=actual[0], tooltip=name + ' start', icon=folium.Icon(color='green')).add_to(map)
                     folium.Marker(location=predict_first_five[-1], tooltip=name + ' end predicted', icon=folium.Icon(color='red')).add_to(map)
@@ -245,4 +254,5 @@ if __name__ == "__main__":
 
     # storm_track(atlantic_hurricane_df)
     # storm_track(pacific_hurricane_df, 'pacific')
-    single_step_visualization(pacific_hurricane_df)
+    both_df = pd.concat([atlantic_hurricane_df, pacific_hurricane_df], axis=0)
+    single_step_visualization(both_df)
